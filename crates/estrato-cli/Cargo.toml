@@ -3,6 +3,10 @@ name = "estrato-cli"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "estrato"
+path = "src/main.rs"
+
 [dependencies]
 estrato = { path = "../estrato" }
 clap = { version = "4", features = ["derive"] }
