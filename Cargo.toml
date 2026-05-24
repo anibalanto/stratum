@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/estrato",
+    "crates/estrato-cli",
+]
+resolver = "2"
