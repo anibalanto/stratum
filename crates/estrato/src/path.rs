@@ -64,12 +64,12 @@ fn parse_down_tokens(s: &str) -> Result<EstratPath, ParseError> {
             // '/' comes before '>' (or there's no '>') → this is the last layer + Simple
             (cmd, Some(slash)) if cmd.map_or(true, |c| slash < c) => {
                 let layer = &rest[..slash];
-                let simple = &rest[slash + 1..];
+                let simple = &rest[slash..]; // keep leading '/'
                 if layer.is_empty() {
                     return Err(ParseError::InvalidSegment(layer.to_string()));
                 }
                 tokens.push(PathToken::Down(layer.to_string()));
-                if !simple.is_empty() {
+                if simple != "/" {
                     tokens.push(PathToken::Simple(PathBuf::from(simple)));
                 }
                 break;
@@ -95,12 +95,12 @@ fn parse_down_tokens(s: &str) -> Result<EstratPath, ParseError> {
             // No '>' but there is a '/' → last layer with Simple suffix
             (None, Some(slash)) => {
                 let layer = &rest[..slash];
-                let simple = &rest[slash + 1..];
+                let simple = &rest[slash..]; // keep leading '/'
                 if layer.is_empty() {
                     return Err(ParseError::InvalidSegment(layer.to_string()));
                 }
                 tokens.push(PathToken::Down(layer.to_string()));
-                if !simple.is_empty() {
+                if simple != "/" {
                     tokens.push(PathToken::Simple(PathBuf::from(simple)));
                 }
                 break;
@@ -118,9 +118,8 @@ fn parse_up_tokens(s: &str) -> Result<EstratPath, ParseError> {
     let mut tokens: EstratPath = (0..levels).map(|_| PathToken::Up).collect();
 
     if rest.starts_with('/') {
-        let simple = &rest[1..];
-        if !simple.is_empty() {
-            tokens.push(PathToken::Simple(PathBuf::from(simple)));
+        if rest.len() > 1 {
+            tokens.push(PathToken::Simple(PathBuf::from(rest))); // keep leading '/'
         }
     } else if !rest.is_empty() {
         return Err(ParseError::InvalidSyntax(s.to_string()));
@@ -181,6 +180,9 @@ pub fn resolve(base: &Path, current: &Path, tokens: &EstratPath) -> Result<PathB
                 path = path.join("..").join("..");
             }
             PathToken::Simple(p) => {
+                // Strip leading '/' (separator artifact) before joining,
+                // so PathBuf::join doesn't treat it as an absolute path.
+                let p = p.strip_prefix("/").unwrap_or(p);
                 path = path.join(p);
             }
         }
@@ -234,7 +236,7 @@ mod tests {
             Ok(vec![
                 PathToken::Down("tech-decisions".into()),
                 PathToken::Down("impl".into()),
-                PathToken::Simple(PathBuf::from("package1/solution.rs")),
+                PathToken::Simple(PathBuf::from("/package1/solution.rs")),
             ])
         );
     }
@@ -245,7 +247,7 @@ mod tests {
             parse_path(">tasks/pending.md"),
             Ok(vec![
                 PathToken::Down("tasks".into()),
-                PathToken::Simple(PathBuf::from("pending.md")),
+                PathToken::Simple(PathBuf::from("/pending.md")),
             ])
         );
     }
@@ -262,7 +264,7 @@ mod tests {
             Ok(vec![
                 PathToken::Up,
                 PathToken::Up,
-                PathToken::Simple(PathBuf::from("docs/api.md")),
+                PathToken::Simple(PathBuf::from("/docs/api.md")),
             ])
         );
     }
