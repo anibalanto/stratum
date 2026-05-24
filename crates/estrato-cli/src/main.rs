@@ -1,11 +1,11 @@
 use clap::Parser;
-use estrato::{parse, resolve_down, resolve_up, Context, Query};
+use estrato::{parse, resolve, Context, Query};
 use std::process;
 
 #[derive(Parser)]
 #[command(name = "estrato", about = "Navegación por capas Estrato")]
 struct Cli {
-    /// Query de navegación: '>name1>name2', '<<', '>?', '<?'
+    /// Path Estrato: '>name>name2/fs-path', '<<', '>?', '<?', o path tradicional
     query: Option<String>,
 }
 
@@ -40,18 +40,11 @@ fn main() {
     };
 
     match query {
-        Query::Down(segments) => match resolve_down(&cwd, &segments) {
+        Query::Path(tokens) => match resolve(&cwd, &cwd, &tokens) {
             Ok(path) => {
-                let rel = path.strip_prefix(&cwd).unwrap_or(&path);
-                println!("{}", rel.display());
+                let display = path.strip_prefix(&cwd).unwrap_or(&path);
+                println!("{}", display.display());
             }
-            Err(e) => {
-                eprintln!("error: {e}");
-                process::exit(1);
-            }
-        },
-        Query::Up(n) => match resolve_up(&cwd, n) {
-            Ok(path) => println!("{}", path.display()),
             Err(e) => {
                 eprintln!("error: {e}");
                 process::exit(1);
