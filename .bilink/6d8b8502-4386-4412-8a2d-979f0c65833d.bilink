@@ -1,0 +1,12 @@
+link.0: <
+link.1: crates/stratum/src/up.rs
+
+# Cache
+hash.0: 25e2a1c6e3f009a3a49596a683d5d90ccccc6b73839a167ab7e2f857c25de58f
+commit.0: 4b620df6546bce1f93b4aefe847b6d1c3fc18bc2
+hash.1: 61ba0719f198ba38a5a1935d6c4c80316de9a7c7ae646db5705c65ca6a70c477
+commit.1: 3063fad067ab92954b67b7470fa7be5054dc4115
+range.1: 0~2980
+state.0: OK
+state.1: OK
+resolved_at: 2026-05-30T16:57:07Z
