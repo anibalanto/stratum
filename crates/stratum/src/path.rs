@@ -6,6 +6,7 @@ pub enum PathToken {
     Down(String),    // `>name`  — navigate into `.stratum/<name>`
     Up,              // `<`      — go up one stratum level (`../..`)
     Root,            // `<*`     — project root (nearest `.git` ancestor)
+    TopRoot,         // `*`      — outermost `.git` ancestor (top of the whole project)
     Simple(PathBuf), // traditional path component — joined as-is
 }
 
@@ -36,6 +37,7 @@ impl std::fmt::Display for ParseError {
 /// - Starts with `>`: sequence of `Down` tokens, terminated by a `/` which begins a `Simple`.
 /// - Starts with `<*`: `Root` token, followed by optional `Simple` and `Down` tokens.
 /// - Starts with `<`: sequence of `Up` tokens, terminated by a `/` which begins a `Simple`.
+/// - Starts with `*`: `TopRoot` token (outermost `.git`), followed by optional `Simple`/`Down`.
 /// - Anything else: a single `Simple` token (traditional path, returned as-is).
 pub fn parse_path(s: &str) -> Result<StratumPath, ParseError> {
     if s.is_empty() {
@@ -55,6 +57,10 @@ pub fn parse_path(s: &str) -> Result<StratumPath, ParseError> {
         return parse_up_tokens(s);
     }
 
+    if s.starts_with('*') {
+        return parse_top_root_token(s);
+    }
+
     Ok(vec![PathToken::Simple(PathBuf::from(s))])
 }
 
@@ -66,6 +72,7 @@ pub fn format_path(tokens: &StratumPath) -> String {
             PathToken::Down(name) => { s.push('>'); s.push_str(name); }
             PathToken::Up        => s.push('<'),
             PathToken::Root      => s.push_str("<*"),
+            PathToken::TopRoot   => s.push('*'),
             PathToken::Simple(p) => s.push_str(&p.display().to_string()),
         }
     }
@@ -205,8 +212,10 @@ impl std::fmt::Display for ResolveError {
 pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<PathBuf, ResolveError> {
     use crate::up::depth;
 
-    let using_root = matches!(tokens.first(), Some(PathToken::Root));
-    let using_up   = !using_root && tokens.iter().any(|t| *t == PathToken::Up);
+    let using_root     = matches!(tokens.first(), Some(PathToken::Root));
+    let using_top_root = matches!(tokens.first(), Some(PathToken::TopRoot));
+    let using_up       = !using_root && !using_top_root
+                         && tokens.iter().any(|t| *t == PathToken::Up);
 
     if using_up {
         let actual_depth = depth(current);
@@ -219,7 +228,9 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
         }
     }
 
-    let mut path = if using_root {
+    let mut path = if using_top_root {
+        find_outermost_git_root(base).ok_or(ResolveError::NoProjectRoot)?
+    } else if using_root {
         find_git_root(base).ok_or(ResolveError::NoProjectRoot)?
     } else if using_up {
         PathBuf::new() // relative
@@ -229,7 +240,7 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
 
     for token in tokens {
         match token {
-            PathToken::Root => {} // initial path already set above
+            PathToken::Root | PathToken::TopRoot => {} // initial path already set above
             PathToken::Down(name) => {
                 path = path.join(".stratum").join(name);
             }
@@ -244,11 +255,96 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
         }
     }
 
-    if path.exists() || using_up || using_root {
+    if path.exists() || using_up || using_root || using_top_root {
         Ok(path)
     } else {
         Err(ResolveError::NotFound(path))
     }
+}
+
+fn parse_top_root_token(s: &str) -> Result<StratumPath, ParseError> {
+    // s starts with "*"
+    let rest = &s[1..];
+    let mut tokens = vec![PathToken::TopRoot];
+
+    if rest.is_empty() {
+        return Ok(tokens);
+    }
+
+    if rest.starts_with('/') {
+        if let Some(gt_pos) = rest.find('>') {
+            let simple_part = &rest[..gt_pos];
+            let down_part   = &rest[gt_pos..];
+            if !simple_part.is_empty() && simple_part != "/" {
+                tokens.push(PathToken::Simple(PathBuf::from(simple_part)));
+            }
+            tokens.extend(parse_down_tokens(down_part)?);
+        } else {
+            tokens.push(PathToken::Simple(PathBuf::from(rest)));
+        }
+    } else if rest.starts_with('>') {
+        tokens.extend(parse_down_tokens(rest)?);
+    } else {
+        return Err(ParseError::InvalidSyntax(s.to_string()));
+    }
+
+    Ok(tokens)
+}
+
+/// Converts the current working directory into a stratum path starting from `*` (TopRoot).
+///
+/// Example: `/home/user/acreta/subsystems/stratum/.stratum/impl`
+///          → `[TopRoot, Simple("/subsystems/stratum"), Down("impl")]`
+///          → `*/subsystems/stratum>impl`
+pub fn cwd_as_stratum_path(cwd: &Path) -> Option<StratumPath> {
+    let top_root = find_outermost_git_root(cwd)?;
+    let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+    let rel = cwd_canon.strip_prefix(&top_root).ok()?;
+
+    let mut tokens = vec![PathToken::TopRoot];
+    let components: Vec<_> = rel.components().collect();
+
+    let mut i = 0;
+    let mut simple_parts: Vec<String> = Vec::new();
+
+    while i < components.len() {
+        let comp = components[i].as_os_str().to_string_lossy();
+        if comp == ".stratum" && i + 1 < components.len() {
+            if !simple_parts.is_empty() {
+                let path_str = format!("/{}", simple_parts.join("/"));
+                tokens.push(PathToken::Simple(PathBuf::from(path_str)));
+                simple_parts.clear();
+            }
+            i += 1; // skip ".stratum"
+            let layer = components[i].as_os_str().to_string_lossy().to_string();
+            tokens.push(PathToken::Down(layer));
+            i += 1;
+        } else {
+            simple_parts.push(comp.to_string());
+            i += 1;
+        }
+    }
+
+    if !simple_parts.is_empty() {
+        tokens.push(PathToken::Simple(PathBuf::from(format!("/{}", simple_parts.join("/")))));
+    }
+
+    Some(tokens)
+}
+
+fn find_outermost_git_root(start: &Path) -> Option<PathBuf> {
+    let mut candidate = start.canonicalize().unwrap_or_else(|_| start.to_path_buf());
+    let mut outermost = None;
+    loop {
+        if candidate.join(".git").exists() {
+            outermost = Some(candidate.clone());
+        }
+        match candidate.parent() {
+            Some(p) => candidate = p.to_path_buf(),
+            None    => break,
+        }
+    }
+    outermost
 }
 
 fn find_git_root(start: &Path) -> Option<PathBuf> {
@@ -490,6 +586,102 @@ mod tests {
     fn resolve_root_no_git_is_error() {
         let dir = tempdir().unwrap();
         let tokens = parse_path("<*").unwrap();
+        let err = resolve(dir.path(), dir.path(), &tokens).unwrap_err();
+        assert_eq!(err, ResolveError::NoProjectRoot);
+    }
+
+    // --- TopRoot (*) ---
+
+    #[test]
+    fn top_root_alone() {
+        assert_eq!(parse_path("*"), Ok(vec![PathToken::TopRoot]));
+    }
+
+    #[test]
+    fn top_root_with_simple() {
+        assert_eq!(
+            parse_path("*/subsystems/stratum"),
+            Ok(vec![
+                PathToken::TopRoot,
+                PathToken::Simple(PathBuf::from("/subsystems/stratum")),
+            ])
+        );
+    }
+
+    #[test]
+    fn top_root_with_down() {
+        assert_eq!(
+            parse_path("*>impl"),
+            Ok(vec![PathToken::TopRoot, PathToken::Down("impl".into())])
+        );
+    }
+
+    #[test]
+    fn top_root_full_example() {
+        assert_eq!(
+            parse_path("*/subsystems/stratum>impl/crates/stratum/src"),
+            Ok(vec![
+                PathToken::TopRoot,
+                PathToken::Simple(PathBuf::from("/subsystems/stratum")),
+                PathToken::Down("impl".into()),
+                PathToken::Simple(PathBuf::from("/crates/stratum/src")),
+            ])
+        );
+    }
+
+    #[test]
+    fn top_root_invalid_suffix() {
+        assert!(matches!(parse_path("*foo"), Err(ParseError::InvalidSyntax(_))));
+    }
+
+    #[test]
+    fn format_top_root() {
+        assert_eq!(format_path(&vec![PathToken::TopRoot]), "*");
+    }
+
+    #[test]
+    fn roundtrip_top_root_path() {
+        let s = "*/subsystems/stratum>impl/crates/stratum/src";
+        assert_eq!(format_path(&parse_path(s).unwrap()), s);
+    }
+
+    #[test]
+    fn resolve_top_root_finds_outermost_git() {
+        let dir = tempdir().unwrap();
+        let outer = dir.path();
+        // outer git root
+        std::fs::create_dir(outer.join(".git")).unwrap();
+        // inner git root nested inside
+        let inner = outer.join("subsystems").join("foo");
+        std::fs::create_dir_all(&inner).unwrap();
+        std::fs::create_dir(inner.join(".git")).unwrap();
+
+        // Resolve from inner: should return outer, not inner
+        let tokens = parse_path("*").unwrap();
+        let result = resolve(&inner, &inner, &tokens).unwrap();
+        assert_eq!(result, outer.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_top_root_with_path() {
+        let dir = tempdir().unwrap();
+        let outer = dir.path();
+        std::fs::create_dir(outer.join(".git")).unwrap();
+        let sub = outer.join("subsystems").join("foo");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::create_dir(sub.join(".git")).unwrap();
+        let docs = outer.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
+
+        let tokens = parse_path("*/docs").unwrap();
+        let result = resolve(&sub, &sub, &tokens).unwrap();
+        assert_eq!(result, docs.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_top_root_no_git_is_error() {
+        let dir = tempdir().unwrap();
+        let tokens = parse_path("*").unwrap();
         let err = resolve(dir.path(), dir.path(), &tokens).unwrap_err();
         assert_eq!(err, ResolveError::NoProjectRoot);
     }
