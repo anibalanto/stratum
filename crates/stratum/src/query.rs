@@ -1,9 +1,9 @@
-use crate::path::{parse_path, EstratPath, ParseError};
+use crate::path::{parse_path, StratumPath, ParseError};
 
 /// A CLI query: either a path expression or an info command.
 #[derive(Debug, PartialEq)]
 pub enum Query {
-    Path(EstratPath),
+    Path(StratumPath),
     ListDown,  // `>?`
     ListUp,    // `<?`
 }

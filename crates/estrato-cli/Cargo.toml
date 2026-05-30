@@ -8,5 +8,5 @@ name = "estrato"
 path = "src/main.rs"
 
 [dependencies]
-estrato = { path = "../estrato" }
+stratum = { path = "../stratum" }
 clap = { version = "4", features = ["derive"] }

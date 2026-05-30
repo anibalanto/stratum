@@ -133,18 +133,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "estrato"
-version = "0.1.0"
-dependencies = [
- "tempfile",
-]
-
-[[package]]
 name = "estrato-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "estrato",
+ "stratum",
 ]
 
 [[package]]
@@ -358,6 +351,13 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "stratum"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

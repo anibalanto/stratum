@@ -25,8 +25,8 @@ impl Context {
 }
 
 fn list_sub_layers(dir: &Path) -> Vec<String> {
-    let estrato_dir = dir.join(".estrato");
-    let Ok(entries) = std::fs::read_dir(&estrato_dir) else {
+    let stratum_dir = dir.join(".stratum");
+    let Ok(entries) = std::fs::read_dir(&stratum_dir) else {
         return vec![];
     };
     let mut names: Vec<String> = entries
@@ -46,8 +46,8 @@ mod tests {
     #[test]
     fn context_at_root_with_sub_layers() {
         let dir = tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join(".estrato/impl")).unwrap();
-        std::fs::create_dir_all(dir.path().join(".estrato/tech-decisions")).unwrap();
+        std::fs::create_dir_all(dir.path().join(".stratum/impl")).unwrap();
+        std::fs::create_dir_all(dir.path().join(".stratum/tech-decisions")).unwrap();
 
         let ctx = Context::from_dir(dir.path());
         assert_eq!(ctx.depth, 0);
@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn context_one_deep_no_sub_layers() {
         let dir = tempdir().unwrap();
-        let inner = dir.path().join(".estrato/impl");
+        let inner = dir.path().join(".stratum/impl");
         std::fs::create_dir_all(&inner).unwrap();
 
         let ctx = Context::from_dir(&inner);

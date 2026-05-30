@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "crates/estrato",
+    "crates/stratum",
     "crates/estrato-cli",
 ]
 resolver = "2"

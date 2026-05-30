@@ -1,5 +1,5 @@
 use clap::Parser;
-use estrato::{parse, resolve, Context, Query};
+use stratum::{parse, resolve, Context, Query};
 use std::process;
 
 #[derive(Parser)]

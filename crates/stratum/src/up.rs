@@ -16,7 +16,7 @@ impl std::fmt::Display for UpError {
     }
 }
 
-/// Counts how many estrato levels deep `path` is by scanning for `.estrato/<name>` pairs.
+/// Counts how many stratum levels deep `path` is by scanning for `.stratum/<name>` pairs.
 pub fn depth(path: &Path) -> usize {
     let components: Vec<_> = path.components().collect();
     let mut count = 0;
@@ -24,7 +24,7 @@ pub fn depth(path: &Path) -> usize {
     while i + 1 < components.len() {
         let a = components[i].as_os_str();
         let b = components[i + 1].as_os_str();
-        if a == ".estrato" && !b.is_empty() && b != ".estrato" {
+        if a == ".stratum" && !b.is_empty() && b != ".stratum" {
             count += 1;
             i += 2;
         } else {
@@ -34,7 +34,7 @@ pub fn depth(path: &Path) -> usize {
     count
 }
 
-/// Returns a relative path going up `levels` estrato levels (each = `../..`),
+/// Returns a relative path going up `levels` stratum levels (each = `../..`),
 /// appending `suffix` if provided. Validates that depth >= levels.
 pub fn resolve_up(
     current: &Path,
@@ -68,39 +68,39 @@ mod tests {
     fn depth_root() { assert_eq!(depth(&p("/home/user/project")), 0); }
 
     #[test]
-    fn depth_one() { assert_eq!(depth(&p("/project/.estrato/impl")), 1); }
+    fn depth_one() { assert_eq!(depth(&p("/project/.stratum/impl")), 1); }
 
     #[test]
     fn depth_two() {
-        assert_eq!(depth(&p("/project/.estrato/tech/.estrato/impl")), 2);
+        assert_eq!(depth(&p("/project/.stratum/tech/.stratum/impl")), 2);
     }
 
     #[test]
     fn up_one() {
-        assert_eq!(resolve_up(&p("/project/.estrato/impl"), 1, None).unwrap(), p("../.."));
+        assert_eq!(resolve_up(&p("/project/.stratum/impl"), 1, None).unwrap(), p("../.."));
     }
 
     #[test]
     fn up_two() {
-        let result = resolve_up(&p("/project/.estrato/tech/.estrato/impl"), 2, None).unwrap();
+        let result = resolve_up(&p("/project/.stratum/tech/.stratum/impl"), 2, None).unwrap();
         assert_eq!(result, p("../../../.."));
     }
 
     #[test]
     fn up_with_suffix() {
         let result =
-            resolve_up(&p("/project/.estrato/impl"), 1, Some(Path::new("src/main.rs"))).unwrap();
+            resolve_up(&p("/project/.stratum/impl"), 1, Some(Path::new("src/main.rs"))).unwrap();
         assert_eq!(result, p("../../src/main.rs"));
     }
 
     #[test]
     fn up_exceeds_depth() {
-        let err = resolve_up(&p("/project/.estrato/impl"), 3, None).unwrap_err();
+        let err = resolve_up(&p("/project/.stratum/impl"), 3, None).unwrap_err();
         assert!(matches!(err, UpError::InsufficientDepth { requested: 3, actual: 1 }));
     }
 
     #[test]
     fn up_zero_is_error() {
-        assert!(resolve_up(&p("/project/.estrato/impl"), 0, None).is_err());
+        assert!(resolve_up(&p("/project/.stratum/impl"), 0, None).is_err());
     }
 }
