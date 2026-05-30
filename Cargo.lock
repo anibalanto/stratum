@@ -136,6 +136,7 @@ dependencies = [
 name = "estrato-cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
  "stratum",
 ]
