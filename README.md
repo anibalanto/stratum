@@ -84,7 +84,7 @@ up:   0
 down: (ninguna)
 ```
 
-### `stratum pws` — path Stratum del directorio actual
+### `stratum pws` — path Stratum del directorio actual (print working stratum)
 
 ```bash
 $ stratum pws
