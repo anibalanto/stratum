@@ -4,8 +4,9 @@ link.1: crates/estrato-cli/src/main.rs :: (enum_item name: (type_identifier) @n0
 # Cache
 hash.0: 282bccc8b075ffe7826010ecb27d4feaa8af8a4deb92921f8af4cacdf6014a90
 commit.0: 
-hash.1: a6706965fd4719777eada25aa9560044d335d67b8cf41d53211607ecf7df8773
-commit.1: 8c650cb74d1b70218d36d9b333d14b8ea804d401
+hash.1: d9660190c50412685446be693e785aee1179cb7820c0449c83c37b1be372942f
+commit.1: 474327d83760d02f7ccddf336df85c0f5cc9752f
+range.1: 370~1410
 state.0: OK
 state.1: OK
-resolved_at: 2026-05-30T18:43:56Z
+resolved_at: 2026-06-01T18:53:23Z
