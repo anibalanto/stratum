@@ -61,6 +61,19 @@ pub fn parse_path(s: &str) -> Result<StratumPath, ParseError> {
         return parse_top_root_token(s);
     }
 
+    // Path with embedded `>` navigation (e.g. "subsystems/bilinker>impl/crates/foo").
+    if let Some(gt_pos) = s.find('>') {
+        let simple_part = &s[..gt_pos];
+        let down_part   = &s[gt_pos..]; // starts with '>'
+        let mut tokens: StratumPath = if !simple_part.is_empty() {
+            vec![PathToken::Simple(PathBuf::from(simple_part))]
+        } else {
+            vec![]
+        };
+        tokens.extend(parse_down_tokens(down_part)?);
+        return Ok(tokens);
+    }
+
     Ok(vec![PathToken::Simple(PathBuf::from(s))])
 }
 
@@ -233,7 +246,8 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
     } else if using_root {
         find_git_root(base).ok_or(ResolveError::NoProjectRoot)?
     } else if using_up {
-        PathBuf::new() // relative
+        // Start from the current layer root so each Up exits exactly one .stratum/<name> level.
+        find_layer_root(base).unwrap_or_else(|| base.to_path_buf())
     } else {
         base.to_path_buf()
     };
@@ -245,7 +259,11 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
                 path = path.join(".stratum").join(name);
             }
             PathToken::Up => {
-                path = path.join("..").join("..");
+                // Exit .stratum/<name>: go up two real directory levels.
+                path = path.parent()
+                    .and_then(|p| p.parent())
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or(path);
             }
             PathToken::Simple(p) => {
                 // Strip leading '/' so PathBuf::join doesn't treat it as absolute.
@@ -330,6 +348,27 @@ pub fn cwd_as_stratum_path(cwd: &Path) -> Option<StratumPath> {
     }
 
     Some(tokens)
+}
+
+/// Returns the current layer root: the path up to and including the last `.stratum/<name>` pair.
+/// From `.stratum/impl/crates/foo` → `.stratum/impl`.
+/// Works purely on path components — no filesystem I/O.
+fn find_layer_root(path: &Path) -> Option<PathBuf> {
+    let components: Vec<_> = path.components().collect();
+    let mut last_end = None;
+    let mut i = 0;
+    while i + 1 < components.len() {
+        if components[i].as_os_str() == ".stratum" {
+            let name = components[i + 1].as_os_str();
+            if !name.is_empty() && name != ".stratum" {
+                last_end = Some(i + 2);
+                i += 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    last_end.map(|end| components[..end].iter().collect())
 }
 
 fn find_outermost_git_root(start: &Path) -> Option<PathBuf> {
@@ -512,6 +551,35 @@ mod tests {
     // --- resolve ---
 
     #[test]
+    fn simple_with_down() {
+        assert_eq!(
+            parse_path("subsystems/bilinker>impl"),
+            Ok(vec![
+                PathToken::Simple(PathBuf::from("subsystems/bilinker")),
+                PathToken::Down("impl".into()),
+            ])
+        );
+    }
+
+    #[test]
+    fn simple_with_down_and_path() {
+        assert_eq!(
+            parse_path("subsystems/bilinker>impl/crates/foo"),
+            Ok(vec![
+                PathToken::Simple(PathBuf::from("subsystems/bilinker")),
+                PathToken::Down("impl".into()),
+                PathToken::Simple(PathBuf::from("/crates/foo")),
+            ])
+        );
+    }
+
+    #[test]
+    fn roundtrip_simple_with_down() {
+        let s = "subsystems/bilinker>impl";
+        assert_eq!(format_path(&parse_path(s).unwrap()), s);
+    }
+
+    #[test]
     fn resolve_simple() {
         let dir = tempdir().unwrap();
         let file = dir.path().join("docs").join("readme.md");
@@ -541,7 +609,33 @@ mod tests {
         let current = PathBuf::from("/project/.stratum/impl");
         let tokens = parse_path("<").unwrap();
         let result = resolve(&current, &current, &tokens).unwrap();
-        assert_eq!(result, PathBuf::from("../.."));
+        assert_eq!(result, PathBuf::from("/project"));
+    }
+
+    #[test]
+    fn resolve_up_from_subdirectory() {
+        // Even when base is deep inside the layer, < exits to the parent layer root.
+        let current = PathBuf::from("/project/.stratum/impl/crates/bilinker/src");
+        let tokens = parse_path("<").unwrap();
+        let result = resolve(&current, &current, &tokens).unwrap();
+        assert_eq!(result, PathBuf::from("/project"));
+    }
+
+    #[test]
+    fn resolve_up_nested_layers() {
+        // From impl nested under tech, < goes to tech layer root.
+        let current = PathBuf::from("/project/.stratum/tech/.stratum/impl");
+        let tokens = parse_path("<").unwrap();
+        let result = resolve(&current, &current, &tokens).unwrap();
+        assert_eq!(result, PathBuf::from("/project/.stratum/tech"));
+    }
+
+    #[test]
+    fn resolve_up_two_nested_layers() {
+        let current = PathBuf::from("/project/.stratum/tech/.stratum/impl");
+        let tokens = parse_path("<<").unwrap();
+        let result = resolve(&current, &current, &tokens).unwrap();
+        assert_eq!(result, PathBuf::from("/project"));
     }
 
     #[test]
