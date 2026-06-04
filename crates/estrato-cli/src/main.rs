@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use stratum::{parse, parse_path, resolve, cwd_as_stratum_path, format_path, Context, Query};
+use stratum::{parse, parse_path, resolve, cwd_as_stratum_path, format_path, Context, Query, PathToken};
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -99,7 +99,8 @@ fn main() {
                 Err(e) => { eprintln!("error: {e}"); process::exit(1); }
             };
             println!("{}", path);
-            print_stratum_children(&root, "");
+            let starts_in_impl = tokens.last().map_or(false, |t| matches!(t, PathToken::Down(_)));
+            print_stratum_children(&root, "", starts_in_impl);
         }
 
         Some(Commands::Query(args)) => {
@@ -138,19 +139,19 @@ fn main() {
     }
 }
 
-fn print_stratum_children(dir: &Path, prefix: &str) {
-    let children = stratum_children(dir);
+fn print_stratum_children(dir: &Path, prefix: &str, is_impl_layer: bool) {
+    let children = stratum_children(dir, is_impl_layer);
     let n = children.len();
-    for (i, (label, path)) in children.into_iter().enumerate() {
+    for (i, (label, path, child_is_impl)) in children.into_iter().enumerate() {
         let is_last = i == n - 1;
         let conn   = if is_last { "└── " } else { "├── " };
         let extend = if is_last { "    " } else { "│   " };
         println!("{}{}{}", prefix, conn, label);
-        print_stratum_children(&path, &format!("{}{}", prefix, extend));
+        print_stratum_children(&path, &format!("{}{}", prefix, extend), child_is_impl);
     }
 }
 
-fn stratum_children(dir: &Path) -> Vec<(String, PathBuf)> {
+fn stratum_children(dir: &Path, is_impl_layer: bool) -> Vec<(String, PathBuf, bool)> {
     let mut children = vec![];
 
     let stratum_dir = dir.join(".stratum");
@@ -162,23 +163,25 @@ fn stratum_children(dir: &Path) -> Vec<(String, PathBuf)> {
             .collect();
         layers.sort();
         for layer in layers {
-            children.push((format!(">{}", layer), stratum_dir.join(&layer)));
+            children.push((format!(">{}", layer), stratum_dir.join(&layer), true));
         }
     }
 
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        let mut sub_dirs: Vec<_> = entries
-            .flatten()
-            .filter(|e| {
-                let p = e.path();
-                let s = e.file_name();
-                let name = s.to_string_lossy();
-                p.is_dir() && !name.starts_with('.') && has_stratum_content(&p)
-            })
-            .collect();
-        sub_dirs.sort_by_key(|e| e.file_name());
-        for entry in sub_dirs {
-            children.push((entry.file_name().into_string().unwrap_or_default(), entry.path()));
+    if !is_impl_layer {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut sub_dirs: Vec<_> = entries
+                .flatten()
+                .filter(|e| {
+                    let p = e.path();
+                    let s = e.file_name();
+                    let name = s.to_string_lossy();
+                    p.is_dir() && !name.starts_with('.') && has_stratum_content(&p)
+                })
+                .collect();
+            sub_dirs.sort_by_key(|e| e.file_name());
+            for entry in sub_dirs {
+                children.push((entry.file_name().into_string().unwrap_or_default(), entry.path(), false));
+            }
         }
     }
 
