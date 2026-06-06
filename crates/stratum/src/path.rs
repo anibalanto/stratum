@@ -259,11 +259,17 @@ pub fn resolve(base: &Path, current: &Path, tokens: &StratumPath) -> Result<Path
                 path = path.join(".stratum").join(name);
             }
             PathToken::Up => {
-                // Exit .stratum/<name>: go up two real directory levels.
+                // Exit .stratum/<name> and find the nearest ancestor layer root (.bilink/).
                 path = path.parent()
                     .and_then(|p| p.parent())
                     .map(|p| p.to_path_buf())
-                    .unwrap_or(path);
+                    .unwrap_or_else(|| path.clone());
+                while !path.join(".bilink").is_dir() {
+                    match path.parent() {
+                        Some(p) => path = p.to_path_buf(),
+                        None => break,
+                    }
+                }
             }
             PathToken::Simple(p) => {
                 // Strip leading '/' so PathBuf::join doesn't treat it as absolute.
@@ -606,36 +612,81 @@ mod tests {
 
     #[test]
     fn resolve_up() {
-        let current = PathBuf::from("/project/.stratum/impl");
+        let dir = tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir_all(project.join(".bilink")).unwrap();
+        let layer = project.join(".stratum").join("impl");
+        std::fs::create_dir_all(&layer).unwrap();
+        std::fs::create_dir_all(layer.join(".bilink")).unwrap();
+
         let tokens = parse_path("<").unwrap();
-        let result = resolve(&current, &current, &tokens).unwrap();
-        assert_eq!(result, PathBuf::from("/project"));
+        let result = resolve(&layer, &layer, &tokens).unwrap();
+        assert_eq!(result, project.canonicalize().unwrap());
     }
 
     #[test]
     fn resolve_up_from_subdirectory() {
         // Even when base is deep inside the layer, < exits to the parent layer root.
-        let current = PathBuf::from("/project/.stratum/impl/crates/bilinker/src");
+        let dir = tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir_all(project.join(".bilink")).unwrap();
+        let layer_root = project.join(".stratum").join("impl");
+        std::fs::create_dir_all(layer_root.join(".bilink")).unwrap();
+        let current = layer_root.join("crates").join("bilinker").join("src");
+        std::fs::create_dir_all(&current).unwrap();
+
         let tokens = parse_path("<").unwrap();
         let result = resolve(&current, &current, &tokens).unwrap();
-        assert_eq!(result, PathBuf::from("/project"));
+        assert_eq!(result, project.canonicalize().unwrap());
     }
 
     #[test]
     fn resolve_up_nested_layers() {
-        // From impl nested under tech, < goes to tech layer root.
-        let current = PathBuf::from("/project/.stratum/tech/.stratum/impl");
+        // From impl nested under tech (which has .bilink/), < goes to tech layer root.
+        let dir = tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir_all(project.join(".bilink")).unwrap();
+        let tech = project.join(".stratum").join("tech");
+        std::fs::create_dir_all(tech.join(".bilink")).unwrap();
+        let impl_layer = tech.join(".stratum").join("impl");
+        std::fs::create_dir_all(impl_layer.join(".bilink")).unwrap();
+
         let tokens = parse_path("<").unwrap();
-        let result = resolve(&current, &current, &tokens).unwrap();
-        assert_eq!(result, PathBuf::from("/project/.stratum/tech"));
+        let result = resolve(&impl_layer, &impl_layer, &tokens).unwrap();
+        assert_eq!(result, tech.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_up_skips_directory_without_bilink() {
+        // If the immediate parent after exiting .stratum/<name> has no .bilink/,
+        // < continues up until it finds one.
+        let dir = tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir_all(project.join(".bilink")).unwrap();
+        // subsystems/foo has NO .bilink/ — it's just a container directory
+        let container = project.join("subsystems").join("foo");
+        let impl_layer = container.join(".stratum").join("impl");
+        std::fs::create_dir_all(impl_layer.join(".bilink")).unwrap();
+
+        let tokens = parse_path("<").unwrap();
+        let result = resolve(&impl_layer, &impl_layer, &tokens).unwrap();
+        // Should skip `container` (no .bilink/) and find `project`
+        assert_eq!(result, project.canonicalize().unwrap());
     }
 
     #[test]
     fn resolve_up_two_nested_layers() {
-        let current = PathBuf::from("/project/.stratum/tech/.stratum/impl");
+        let dir = tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir_all(project.join(".bilink")).unwrap();
+        let tech = project.join(".stratum").join("tech");
+        std::fs::create_dir_all(tech.join(".bilink")).unwrap();
+        let impl_layer = tech.join(".stratum").join("impl");
+        std::fs::create_dir_all(impl_layer.join(".bilink")).unwrap();
+
         let tokens = parse_path("<<").unwrap();
-        let result = resolve(&current, &current, &tokens).unwrap();
-        assert_eq!(result, PathBuf::from("/project"));
+        let result = resolve(&impl_layer, &impl_layer, &tokens).unwrap();
+        assert_eq!(result, project.canonicalize().unwrap());
     }
 
     #[test]
