@@ -1,12 +1,11 @@
 link.0: <
-link.1: crates/estrato-cli/src/main.rs :: (enum_item name: (type_identifier) @n0 (#eq? @n0 "Commands")) @target
+link.1: capture 77363f73-d57c-483b-b678-1809947941e2
 
 # Cache
 hash.0: 7276cd596d4a506da6c8bff6fa1aaf2242e904d6329eefa7140a551be667d35d
 commit.0: 
 hash.1: d9660190c50412685446be693e785aee1179cb7820c0449c83c37b1be372942f
 commit.1: 474327d83760d02f7ccddf336df85c0f5cc9752f
-range.1: 370~1410
 state.0: OK
 state.1: OK
 resolved_at: 2026-06-01T18:53:23Z

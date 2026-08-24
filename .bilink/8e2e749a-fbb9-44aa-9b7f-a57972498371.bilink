@@ -1,12 +1,11 @@
 link.0: <
-link.1: crates/estrato-cli/src/main.rs
+link.1: capture 4ec2e3e8-ecaa-47f8-a925-7fa520c1beba
 
 # Cache
 hash.0: 4ca09a53a15eff3cc227295a46746dcd31c02675becd3e6dfe88a1ee52121401
 commit.0: 79f1589d4992ff686ab2d7187b9b3831a189f346
 hash.1: 5442ed0f652b5835375f72ca8feb46d819b01e8fa83eedc3a5ec36aad46b57e1
 commit.1: 474327d83760d02f7ccddf336df85c0f5cc9752f
-range.1: 0~10825
 state.0: OK
 state.1: OK
 resolved_at: 2026-06-01T18:53:23Z

@@ -1,12 +1,11 @@
 link.0: <
-link.1: crates/estrato-cli/src/main.rs :: (function_item name: (identifier) @n0 (#eq? @n0 "cmd_pull")) @target
+link.1: capture 7ab46ce2-bf92-470a-8c05-d1f733675e1b
 
 # Cache
 hash.0: c00e07602bd560755096b57df1ddb9ed49d816fb8af58a4ec9cde82f21f38db3
 commit.0: 79f1589d4992ff686ab2d7187b9b3831a189f346
 hash.1: 838ea0a48b2c4f29f1b57339dfd0e8050988028fce42e76da154634153935166
 commit.1: 474327d83760d02f7ccddf336df85c0f5cc9752f
-range.1: 6863~8735
 state.0: OK
 state.1: OK
 resolved_at: 2026-06-01T18:53:23Z

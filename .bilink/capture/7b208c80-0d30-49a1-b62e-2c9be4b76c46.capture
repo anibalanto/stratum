@@ -1,0 +1,5 @@
+file:   crates/estrato-cli/src/main.rs
+query:  (function_item name: (identifier) @n0 (#eq? @n0 "cmd_add")) @target
+
+# Cache
+range:       10086~10824
