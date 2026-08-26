@@ -1,4 +1,6 @@
 file:   crates/stratum/src/path.rs
 
 # Cache
-range:       0~22257
+range:       0~28130
+state:       RESOLVED
+resolved_at: 2026-08-26T20:02:00Z

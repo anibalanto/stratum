@@ -2,3 +2,5 @@ file:   crates/stratum/src/up.rs
 
 # Cache
 range:       0~2980
+state:       RESOLVED
+resolved_at: 2026-08-26T20:02:00Z

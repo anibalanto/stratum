@@ -2,6 +2,6 @@ file:   crates/stratum-cli/src/main.rs
 query:  (function_item name: (identifier) @n0 (#eq? @n0 "cmd_add")) @target
 
 # Cache
-range:       10408~10408
+range:       10408~11146
 state:       RESOLVED
 resolved_at: 2026-08-26T20:02:16Z

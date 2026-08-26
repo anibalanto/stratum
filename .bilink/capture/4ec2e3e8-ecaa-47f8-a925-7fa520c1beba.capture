@@ -1,6 +1,6 @@
 file:   crates/stratum-cli/src/main.rs
 
 # Cache
-range:       0~0
+range:       0~11147
 state:       RESOLVED
 resolved_at: 2026-08-26T20:02:16Z
