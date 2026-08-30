@@ -1,7 +1,0 @@
-file:   crates/stratum-cli/src/main.rs
-query:  (function_item name: (identifier) @n0 (#eq? @n0 "cmd_pull")) @target
-
-# Cache
-range:       7185~9057
-state:       RESOLVED
-resolved_at: 2026-08-26T20:02:16Z
