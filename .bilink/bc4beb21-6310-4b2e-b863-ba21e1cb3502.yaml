@@ -1,0 +1,7 @@
+kind: governs
+endpoint:
+  0:
+    link: path <
+  1:
+    link: capture f568ab2b9be8372973930e982c5f412f
+    name: el-verificador
