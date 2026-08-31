@@ -41,9 +41,26 @@ enum Commands {
         #[arg(long)]
         recursive: bool,
     },
+    /// Verifica que los links entre documentos lleguen a algún lado
+    Links {
+        #[command(subcommand)]
+        sub: LinksCommand,
+    },
     /// Path Stratum o consulta de navegación
     #[command(external_subcommand)]
     Query(Vec<String>),
+}
+
+#[derive(Subcommand)]
+enum LinksCommand {
+    /// Reporta los links roto, y falla si hay alguno
+    Check {
+        /// Qué recorrer (default: el directorio actual)
+        path: Option<PathBuf>,
+        /// Verifica también que el #heading exista
+        #[arg(long)]
+        anchors: bool,
+    },
 }
 
 fn main() {
@@ -55,6 +72,27 @@ fn main() {
     });
 
     match cli.command {
+        Some(Commands::Links { sub }) => {
+            let LinksCommand::Check { path, anchors } = sub;
+            let root = path.unwrap_or(cwd);
+            let r = stratum::links::check(&root, anchors);
+
+            println!("{} links internos · {} roto", r.checked, r.broken.len());
+            let mut actual = String::new();
+            for b in &r.broken {
+                if b.from != actual {
+                    println!("\n{}", b.from);
+                    actual = b.from.clone();
+                }
+                println!("    [{:<9}] {}", b.why.to_string(), b.href);
+            }
+            // **Falla.** Es la diferencia con `lattice graph --via doclink`, que
+            // reporta un link muerto como información y nunca sale con error.
+            if !r.broken.is_empty() {
+                process::exit(1);
+            }
+        }
+
         None => {
             let ctx = Context::from_dir(&cwd);
             match ctx.up_path() {
