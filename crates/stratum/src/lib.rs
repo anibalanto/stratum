@@ -1,3 +1,4 @@
+pub mod links;
 pub mod path;
 pub mod query;
 pub mod up;
