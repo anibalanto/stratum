@@ -4,4 +4,9 @@ endpoint:
     link: path <
   1:
     link: capture f568ab2b9be8372973930e982c5f412f
+    accepted:
+      agree:
+      - Anibal
+      link: capture f568ab2b9be8372973930e982c5f412f
+      hash: 60b07cec022cff2ea9765cd60a83c5c8d1f55a1aa29f5d022f2604bc4ccf48be
     name: el-verificador
