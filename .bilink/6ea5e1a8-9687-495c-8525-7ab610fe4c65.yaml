@@ -1,16 +1,16 @@
 kind: governs
 endpoint:
-  0:
+  '0':
     link: path <
     accepted:
-      agree:
+    - agree:
       - Anibal
-      link: capture f3f18bcf3aed5273adf534aede8991f7
+      link: capture 9101efae04835c2d6d114a7c59564908
       hash: f7d3a5acb2d84104311c6f8e2e82bc640505f4a11ee82b6c431c8180d76262b4
-  1:
+  '1':
     link: capture f568ab2b9be8372973930e982c5f412f
     accepted:
-      agree:
+    - agree:
       - Anibal
       link: capture f568ab2b9be8372973930e982c5f412f
       hash: 60b07cec022cff2ea9765cd60a83c5c8d1f55a1aa29f5d022f2604bc4ccf48be
